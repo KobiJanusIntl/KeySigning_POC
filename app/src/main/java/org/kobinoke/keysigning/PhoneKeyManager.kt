@@ -4,13 +4,13 @@ import android.content.Context
 import android.util.Base64
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
-import com.google.crypto.tink.CleartextKeysetHandle
 import com.google.crypto.tink.KeysetHandle
-import com.google.crypto.tink.JsonKeysetReader
-import com.google.crypto.tink.JsonKeysetWriter
-import com.google.crypto.tink.signature.PublicKeySignFactory
+import com.google.crypto.tink.CleartextKeysetHandle
 import com.google.crypto.tink.signature.SignatureConfig
 import com.google.crypto.tink.signature.SignatureKeyTemplates
+import com.google.crypto.tink.signature.PublicKeySignFactory
+import com.google.crypto.tink.JsonKeysetReader
+import com.google.crypto.tink.JsonKeysetWriter
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
@@ -23,7 +23,7 @@ import java.util.UUID
 class PhoneKeyManager(context: Context) {
 
     init {
-        SignatureConfig.register() // Initialize Tink signature primitives
+        SignatureConfig.register() // Initialize Tink
     }
 
     private val masterKey = MasterKey.Builder(context)
@@ -50,8 +50,7 @@ class PhoneKeyManager(context: Context) {
 
             val baos = ByteArrayOutputStream()
             CleartextKeysetHandle.write(keyHandle, JsonKeysetWriter.withOutputStream(baos))
-            val keysetJson = baos.toString(StandardCharsets.UTF_8.name())
-            prefs.edit().putString("ed25519_seed", keysetJson).apply()
+            prefs.edit().putString("ed25519_seed", baos.toString(StandardCharsets.UTF_8.name())).apply()
         }
         return keyHandle!!
     }
@@ -69,7 +68,7 @@ class PhoneKeyManager(context: Context) {
         keyHandle = null
     }
 
-    /** Return raw 32-byte Ed25519 public key */
+    /** Return raw 32-byte Ed25519 public key (exact iOS parity) */
     fun getRawPublicKey(): ByteArray {
         val handle = keyHandle ?: ensureKeys()
         val publicHandle = handle.publicKeysetHandle
@@ -86,7 +85,7 @@ class PhoneKeyManager(context: Context) {
         return Base64.decode(keyBytesBase64, Base64.NO_WRAP)
     }
 
-    /** Derive keyId from private seed */
+    /** KeyId derived from private seed (SHA256 -> UUID) */
     fun getKeyId(): String {
         val handle = keyHandle ?: ensureKeys()
         val baos = ByteArrayOutputStream()
@@ -109,7 +108,7 @@ class PhoneKeyManager(context: Context) {
     fun iso8601String(date: Instant): String =
         DateTimeFormatter.ISO_INSTANT.format(date)
 
-    /** Canonicalize JSONObject recursively (sorted keys, remove signature) */
+    /** Canonicalize JSONObject recursively */
     fun canonicalizeJSON(json: JSONObject): JSONObject {
         val sortedKeys = json.keys().asSequence().sorted()
         val sortedJson = JSONObject()
@@ -131,4 +130,38 @@ class PhoneKeyManager(context: Context) {
         }
         return sortedJson
     }
+
+    /** Create a signed command (nonce + timestamp + signature) */
+    fun createCommand(type: String, payload: Map<String, Any>): PhoneKeySignedCommand {
+        val timestamp = Instant.now()
+        val nonce = UUID.randomUUID().toString()
+
+        val commandJson = JSONObject().apply {
+            put("type", type)
+            put("payload", JSONObject(payload))
+            put("nonce", nonce)
+            put("timestamp", iso8601String(timestamp))
+        }
+
+        val canonicalBytes = canonicalizeJSON(commandJson).toString().toByteArray(Charsets.UTF_8)
+        val signatureBytes = sign(canonicalBytes)
+        val signatureB64 = Base64.encodeToString(signatureBytes, Base64.NO_WRAP)
+
+        return PhoneKeySignedCommand(
+            command = type,
+            payload = payload,
+            nonce = nonce,
+            timestamp = timestamp,
+            signature = signatureB64
+        )
+    }
 }
+
+/** Signed command representation */
+data class PhoneKeySignedCommand(
+    val command: String,
+    val payload: Map<String, Any>,
+    val nonce: String,
+    val timestamp: Instant,
+    val signature: String
+)
