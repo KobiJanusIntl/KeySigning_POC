@@ -9,7 +9,7 @@ android {
 
     defaultConfig {
         applicationId = "org.kobinoke.keysigning"
-        minSdk = 24
+        minSdk = 26
         targetSdk = 35
         versionCode = 1
         versionName = "1.0"
@@ -36,7 +36,8 @@ android {
 }
 
 dependencies {
-
+    implementation("com.google.crypto.tink:tink-android:1.10.0")
+    implementation("androidx.security:security-crypto:1.1.0-alpha04")
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
