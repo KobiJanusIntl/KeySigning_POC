@@ -1,54 +1,61 @@
-# Phone Key Signing
+# Phone Key Signing POC (Android)
 
-Phone Key Signing POC (Android)
+This repository contains a proof-of-concept (POC) Android implementation for **phone key signing** for NFC applications. It demonstrates generating, storing, and using Ed25519 keys securely on a device, including signing arbitrary data and structured commands in a canonical format.
 
-This repository contains a proof-of-concept (POC) Android implementation for phone key signing for NFC applications. It demonstrates generating, storing, and using Ed25519 keys securely on a device, including signing arbitrary data and structured commands in a canonical format.
+## Features
 
-Features
+- **Ed25519 Key Management**  
+  - Generate and persist a 32-byte Ed25519 keypair using Google Tink.  
+  - Secure storage using Android `EncryptedSharedPreferences` with `MasterKey`.
 
-Ed25519 Key Management
+- **Signing Data**  
+  - Sign arbitrary byte arrays with the device’s private key.  
+  - Retrieve the corresponding public key for verification.
 
-Generate and persist a 32-byte Ed25519 keypair using Google Tink.
+- **Signed Commands**  
+  - Create structured commands including `commandId`, timestamp, nonce, and payload.  
+  - Automatically canonicalize JSON (sorted keys, deterministic formatting).  
+  - Sign commands with Ed25519 and attach Base64-encoded signature.
 
-Secure storage using Android EncryptedSharedPreferences with MasterKey.
+- **Access Control List (ACL)**  
+  - Model phone key permissions, schedules, and metadata for fine-grained authorization.  
+  - Canonical JSON representation for signing and verification.  
 
-Signing Data
+## Dependencies
 
-Sign arbitrary byte arrays with the device’s private key.
+- AndroidX Security (`EncryptedSharedPreferences`, `MasterKey`)  
+- Google Tink (`tink-android`)  
+- Kotlin Standard Library  
+- AndroidX Core, AppCompat, Material, and ConstraintLayout  
 
-Retrieve the corresponding public key for verification.
+## Project Structure
 
-Signed Commands
+- **`PhoneKeyManager.kt`**  
+  Handles key generation, storage, signing, and command creation.
 
-Create structured commands including commandId, timestamp, nonce, and payload.
+- **`PhoneKeyAcl.kt`**  
+  Defines ACL structures, permissions, time windows, and canonicalization utilities.
 
-Automatically canonicalize JSON (sorted keys, deterministic formatting).
+- **UI / Example Usage**  
+  A sample activity can be used to test signing, public key retrieval, and command creation on a device.
 
-Sign commands with Ed25519 and attach Base64-encoded signature.
+## Usage Example
 
-Access Control List (ACL)
+```kotlin
+val keyManager = PhoneKeyManager(context)
 
-Model phone key permissions, schedules, and metadata for fine-grained authorization.
+// Ensure keys exist
+keyManager.ensureKeys()
 
-Canonical JSON representation for signing and verification.
+// Sign arbitrary data
+val data = "Hello, NFC!".toByteArray()
+val signature = keyManager.sign(data)
 
-Dependencies
+// Get public key for verification
+val publicKey = keyManager.getRawPublicKey()
 
-AndroidX Security (EncryptedSharedPreferences, MasterKey)
-
-Google Tink (tink-android)
-
-Kotlin Standard Library
-
-AndroidX Core, AppCompat, Material, and ConstraintLayout
-
-Project Structure
-
-PhoneKeyManager.kt
-Handles key generation, storage, signing, and command creation.
-
-PhoneKeyAcl.kt
-Defines ACL structures, permissions, time windows, and canonicalization utilities.
-
-UI / Example Usage
-A sample activity can be used to test signing, public key retrieval, and command creation on a device.
+// Create a signed command
+val command = keyManager.createCommand(
+    type = "unlock",
+    payload = mapOf("lockMac" to "AA:BB:CC:DD:EE:FF")
+)
