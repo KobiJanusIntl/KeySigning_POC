@@ -1,6 +1,7 @@
 package org.kobinoke.keysigning
 
 import android.app.Activity
+import android.content.res.Resources
 import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
@@ -117,13 +118,15 @@ fun Activity.setInsets(rootView: View, isWhite: Boolean = true) {
     makeSystemBarTransparent(isWhite)
     ViewCompat.setOnApplyWindowInsetsListener(rootView) { view, insets ->
         val systemBarsInsets = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-
+        val extraTop = 30.dp
         view.setPadding(
             systemBarsInsets.left,
-            systemBarsInsets.top,
+            systemBarsInsets.top + extraTop,
             systemBarsInsets.right,
             systemBarsInsets.bottom
         )
         WindowInsetsCompat.CONSUMED
     }
 }
+
+val Int.dp: Int get() = (this * Resources.getSystem().displayMetrics.density).toInt()
