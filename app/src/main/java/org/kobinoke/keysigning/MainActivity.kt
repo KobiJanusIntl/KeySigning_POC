@@ -14,7 +14,6 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
-import org.json.JSONObject
 import java.time.Instant
 
 class MainActivity : AppCompatActivity() {
@@ -42,12 +41,11 @@ class MainActivity : AppCompatActivity() {
         }
 
         btnSignAcl.setOnClickListener {
-            val pubKey = keyManager.getRawPublicKey()
             val acl = PhoneKeyAcl(
                 aclId = "acl-123",
                 lockMac = "AA:BB:CC:DD:EE:FF",
                 phoneKeyId = keyManager.getKeyId(),
-                phonePublicKey = pubKey,
+                phonePublicKey = keyManager.getRawPublicKey(),
                 issuedAt = Instant.now(),
                 expiresAt = Instant.now().plusSeconds(3600),
                 schedule = listOf(
@@ -69,25 +67,10 @@ class MainActivity : AppCompatActivity() {
                 )
             )
 
-            // Canonicalize ACL for signing
-            val aclJson = JSONObject().apply {
-                put("aclId", acl.aclId)
-                put("lockMac", acl.lockMac)
-                put("phoneKeyId", acl.phoneKeyId)
-                put("phonePublicKey", Base64.encodeToString(acl.phonePublicKey, Base64.NO_WRAP))
-                put("issuedAt", keyManager.iso8601String(acl.issuedAt))
-                put("expiresAt", keyManager.iso8601String(acl.expiresAt))
-            }
-
-            val canonicalBytes = keyManager.canonicalizeJSON(aclJson).toString().toByteArray(Charsets.UTF_8)
-            val signatureBytes = keyManager.sign(canonicalBytes)
-            acl.signature = PhoneKeyAcl.Signature(
-                algorithm = "Ed25519",
-                value = Base64.encodeToString(signatureBytes, Base64.NO_WRAP)
-            )
-
-            resultText.text = "Signed ACL:\n$acl"
+            val signedAcl = keyManager.signAcl(acl)
+            resultText.text = "Signed ACL:\n$signedAcl"
         }
+
 
         btnSignCommand.setOnClickListener {
             val cmd = keyManager.createCommand(
